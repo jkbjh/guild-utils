@@ -1,0 +1,16 @@
+**/\.idea/
+**/\.ipynb_checkpoints/
+**/*\.pyc
+**/*\.pdf
+**/.mypy_cache/**
+*.orig
+.vscode/
+*~
+*egg-info*
+# reports
+.coverage
+coverage.xml
+pylint.html
+pytest-report.xml
+assets/style.css
+pytest-report.html

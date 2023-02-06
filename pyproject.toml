@@ -39,3 +39,6 @@ include = '''
     | .*tests/.*\.pyi?$
 '''
 
+
+[project.scripts]
+guild-utils-stager = "guild_utils.stager:main"

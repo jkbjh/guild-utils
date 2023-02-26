@@ -1,3 +1,9 @@
 [flake8]
+ignore = C901, E203, E266, E501, W503, F403, E741, E731
 max-line-length = 120
-extend-ignore = E203
+max-complexity = 18
+select = B,C,E,F,W,T4,B9
+filename =
+    ./grounded_q_learning/**/*.py,
+    ./scripts/**/*.py,
+    ./tests/**/*.py,

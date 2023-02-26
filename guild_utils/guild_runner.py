@@ -3,12 +3,10 @@ import copy
 import ctypes
 import getpass
 import json
+import math
 import os
 import queue
 import re
-import math
-# import psutil
-# import atexit
 import shlex
 import signal
 import string
@@ -18,6 +16,9 @@ import tempfile
 import threading
 import time
 import traceback
+
+# import psutil
+# import atexit
 
 libc = ctypes.CDLL("libc.so.6")
 
@@ -44,9 +45,10 @@ wait
 """.strip()  # trailing/leading
 )
 
+
 def chunk(sequence, chunksize):
     for i in range(0, len(sequence), chunksize):
-        yield sequence[i:i+chunksize]
+        yield sequence[i : i + chunksize]
 
 
 def set_pdeathsig(sig=signal.SIGTERM):
@@ -63,6 +65,7 @@ def yesno(query, opt_true=("y", "yes"), opt_false=("n", "no")):
             return True
         elif answer in opt_false:
             return False
+
 
 # #@atexit.register
 # def kill_children(sig=signal.SIGINT):
@@ -114,7 +117,7 @@ class Worker(object):
             time.sleep(0.1)
 
 
-### filter store and read runs.
+# filter store and read runs.
 class Runs:
     @staticmethod
     def guild_read(runsfilter="-Se"):
@@ -166,6 +169,7 @@ class Runs:
         print("Waiting for queue")
         run_queue.join()
         print("All work completed")
+        threads.clear()
 
 
 def main():
@@ -173,7 +177,10 @@ def main():
     group_runsin = parser.add_mutually_exclusive_group()
     group_runsin.add_argument("--guildfilter", type=str, default=None, help="filter string for guild runs")
     group_runsin.add_argument("--runsfile", type=str, default=None, help="json file result of guild runs")
-    group_runsin.add_argument("--runids", nargs="+", )
+    group_runsin.add_argument(
+        "--runids",
+        nargs="+",
+    )
 
     parser.add_argument("--store-runs", type=str, default=None, help="filename to write filtered runs to")
 
@@ -190,8 +197,10 @@ def main():
     # sbatch additional parameters
     parser.add_argument("--jobname", type=str, default="guild-runner")
     parser.add_argument("--nice", type=int, default=0)
-    parser.add_argument("--use-nodes", type=int, default=-1, help="how many parallel sbatch files and thus nodes to use")
-    NUMGPUS = 4  # this is the number of gpus in the node.
+    parser.add_argument(
+        "--use-nodes", type=int, default=-1, help="how many parallel sbatch files and thus nodes to use"
+    )
+    # NUMGPUS = 4  # this is the number of gpus in the node.
     args = parser.parse_args()
 
     if args.guild_home:
@@ -200,7 +209,7 @@ def main():
     else:
         guild_home = ""
 
-    ### read runs...
+    # ---- read runs...
     runs = None
     if args.guildfilter:
         runs = Runs.guild_read(args.guildfilter)
@@ -211,7 +220,7 @@ def main():
 
     if args.store_runs:
         Runs.store_json(runs, args.store_runs)
-    ####
+    # ----
 
     # sbatch or execute:
     if args.exec:
@@ -228,21 +237,27 @@ def main():
         print(f"num jobs: {nr_of_runs}")
         print(f"slots per gpu: {args.jobs_per_gpu}")
         if args.use_nodes > full_nodes:
-            raise RuntimeError((
-                f"We have {nr_of_runs} runs, {args.jobs_per_gpu} jobs/GPU, {NUM_GPUS} GPUs, "
-                f"and thus {worker_slots_per_node} slots per node. "
-                f"{args.use_nodes} are requested, but we can fill only {frac_num_nodes} "
-                f"({full_nodes}) nodes. Use less jobs per node or less nodes."
-            ))
+            raise RuntimeError(
+                (
+                    f"We have {nr_of_runs} runs, {args.jobs_per_gpu} jobs/GPU, {NUM_GPUS} GPUs, "
+                    f"and thus {worker_slots_per_node} slots per node. "
+                    f"{args.use_nodes} are requested, but we can fill only {frac_num_nodes} "
+                    f"({full_nodes}) nodes. Use less jobs per node or less nodes."
+                )
+            )
         if nr_of_nodes < 1:
             over_count = int(abs(args.use_nodes))
             nr_of_nodes = int(math.ceil((nr_of_runs / worker_slots_per_node) / over_count))
-            print((f"Automatic node calculation used, every node should execute {over_count}"
-                   f" jobs sequentially, thus: {nr_of_nodes} nodes"))
+            print(
+                (
+                    f"Automatic node calculation used, every node should execute {over_count}"
+                    f" jobs sequentially, thus: {nr_of_nodes} nodes"
+                )
+            )
 
         # todo chunk heer
         nr_of_jobs_per_node = int(math.ceil(nr_of_runs / nr_of_nodes))
-        joblens = ', '.join([str(len(chunk_runs)) for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node))])
+        joblens = ", ".join([str(len(chunk_runs)) for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node))])
         print(f"jobs per node: [ {joblens} ]")
 
         if not args.sbatch_yes:
@@ -254,7 +269,7 @@ def main():
                 user=getpass.getuser(),
                 cmd=f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu}",
                 jobname=f"{args.jobname}-{i}",
-                guild_home=guild_home
+                guild_home=guild_home,
             )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as sbash:
                 sbash.write(slurm_content)
@@ -266,8 +281,9 @@ def main():
                 print(f"command: {command}")
                 if not args.dry_run:
                     subprocess.run(command, shell=True)
-                pass # create batch with runs here.
+                pass  # create batch with runs here.
         print(f"\n=== {i+1} job files===\n")
+
 
 if __name__ == "__main__":
     main()

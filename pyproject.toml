@@ -42,3 +42,4 @@ include = '''
 
 [project.scripts]
 guild-utils-stager = "guild_utils.stager:main"
+guild-slurm-runner = "guild_utils.guild_runner:main"

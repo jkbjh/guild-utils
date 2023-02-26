@@ -1,0 +1,273 @@
+import argparse
+import copy
+import ctypes
+import getpass
+import json
+import os
+import queue
+import re
+import math
+# import psutil
+# import atexit
+import shlex
+import signal
+import string
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+
+libc = ctypes.CDLL("libc.so.6")
+
+NUM_GPUS = 4
+slurm_template = string.Template(
+    f"""
+#!/bin/bash -l
+#SBATCH --partition=IFIgpu
+#SBATCH --job-name=$jobname
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=${{user}}@uibk.ac.at
+#SBATCH --account=iis ##change to your group
+#SBATCH -n 27 # number of cores
+#SBATCH --gres gpu:{NUM_GPUS} # number of gpus
+#SBATCH --exclusive=user
+#SBATCH -o /scratch/${{user}}/slurm_logs/slurm.%N.%j.out # STDOUT
+#SBATCH -e /scratch/${{user}}/slurm_logs/slurm.%N.%j.err # STDERR
+
+$guild_home
+
+$cmd
+
+wait
+""".strip()  # trailing/leading
+)
+
+def chunk(sequence, chunksize):
+    for i in range(0, len(sequence), chunksize):
+        yield sequence[i:i+chunksize]
+
+
+def set_pdeathsig(sig=signal.SIGTERM):
+    def callable():
+        return libc.prctl(1, sig)
+
+    return callable
+
+
+def yesno(query, opt_true=("y", "yes"), opt_false=("n", "no")):
+    while True:
+        answer = input(query + f" [{','.join(opt_true)}|{','.join(opt_false)}]").lower()
+        if answer in opt_true:
+            return True
+        elif answer in opt_false:
+            return False
+
+# #@atexit.register
+# def kill_children(sig=signal.SIGINT):
+#     print("atexit!")
+#     proc = psutil.Process(os.getpid())
+#     print(f"children: {proc.children()}")
+#     for child in proc.children():
+#         pgrp = os.getpgid(child.pid)
+#         try:
+#             os.killpg(pgrp, sig)
+#         except Exception:
+#             pass
+#         os.kill(child.pid, sig)
+#     try:
+#         os.killpg(proc.pid, sig)
+#     except Exception:
+#         pass
+
+
+class Worker(object):
+    def __init__(self, gpu, thread_num, queue, dry_run=False):
+        self.gpu = gpu
+        self.queue = queue
+        self.thread_num = thread_num
+        self.dry_run = dry_run
+
+    def do_work(self):
+        while True:
+            item = self.queue.get()  # timeout=0.01)
+            runid = item["id"]
+            print(f"Working on {runid}")
+            env = copy.deepcopy(os.environ)
+            env["CUDA_VISIBLE_DEVICES"] = self.gpu
+            try:
+                print(f"guild run -y --restart {runid}")
+                # subprocess.run(f"guild run -y --restart {runid}", shell=True)
+                if not self.dry_run:
+                    subprocess.run(
+                        shlex.split(f"guild run -y --restart {runid}"),
+                        preexec_fn=set_pdeathsig(signal.SIGINT),
+                    )
+                else:
+                    print("(dryrun)")
+                print(f"Finished {runid}")
+            except Exception:
+                traceback.print_exc()
+            finally:
+                self.queue.task_done()
+            time.sleep(0.1)
+
+
+### filter store and read runs.
+class Runs:
+    @staticmethod
+    def guild_read(runsfilter="-Se"):
+        guild_command = f"guild runs --json {runsfilter}"
+        print(f"guild_command: {guild_command}")
+        output = subprocess.check_output(guild_command, shell=True)
+        runs = json.loads(output)
+        return runs
+
+    @staticmethod
+    def bare_ids_to_json(list_of_ids):
+        return [dict(id=runid) for runid in list_of_ids]
+
+    @staticmethod
+    def read_json(filename):
+        with open(filename, "r") as fobj:
+            return json.load(fobj)
+
+    @staticmethod
+    def store_json(runs, filename):
+        assert runs
+        with open(filename, "w") as fobj:
+            json.dump(runs, fobj)
+
+    @staticmethod
+    def execute(runs, jobs_per_gpu, dry_run=False):
+        # retrieve CUDA Device settings
+        CUDA_VISIBLE_DEVICES_str = (
+            re.sub(",+", ",", os.environ.get("CUDA_VISIBLE_DEVICES", "").replace(" ", ","))
+        ).strip()
+        assert CUDA_VISIBLE_DEVICES_str, f"CUDA_VISIBLE_DEVICES does not show devices: {CUDA_VISIBLE_DEVICES_str}"
+        CUDA_VISIBLE_DEVICES = CUDA_VISIBLE_DEVICES_str.split(",")
+
+        run_queue = queue.Queue()
+        for run in runs:
+            run_queue.put(run)
+
+        workers = [
+            Worker(gpu=gpu, thread_num=threadnum, queue=run_queue, dry_run=dry_run)
+            for gpu in CUDA_VISIBLE_DEVICES
+            for threadnum in range(jobs_per_gpu)
+        ]
+        threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
+
+        # block until all tasks are done
+        time.sleep(3)
+        print("-------\n" * 10)
+        print(f"PID: {os.getpid()}")
+        print("Waiting for queue")
+        run_queue.join()
+        print("All work completed")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    group_runsin = parser.add_mutually_exclusive_group()
+    group_runsin.add_argument("--guildfilter", type=str, default=None, help="filter string for guild runs")
+    group_runsin.add_argument("--runsfile", type=str, default=None, help="json file result of guild runs")
+    group_runsin.add_argument("--runids", nargs="+", )
+
+    parser.add_argument("--store-runs", type=str, default=None, help="filename to write filtered runs to")
+
+    group_execute = parser.add_mutually_exclusive_group()
+    group_execute.add_argument("--sbatch", action="store_true")
+    parser.add_argument("--sbatch-yes", action="store_true")
+    parser.add_argument("--sbatch-verbose", action="store_true")
+    group_execute.add_argument("--exec", action="store_true")
+
+    parser.add_argument("--jobs-per-gpu", type=int, default=5)
+    parser.add_argument("--dry-run", action="store_true")
+
+    parser.add_argument("--guild-home", type=str, default=None, help="GUILD_HOME directory")
+    # sbatch additional parameters
+    parser.add_argument("--jobname", type=str, default="guild-runner")
+    parser.add_argument("--nice", type=int, default=0)
+    parser.add_argument("--use-nodes", type=int, default=-1, help="how many parallel sbatch files and thus nodes to use")
+    NUMGPUS = 4  # this is the number of gpus in the node.
+    args = parser.parse_args()
+
+    if args.guild_home:
+        os.environ["GUILD_HOME"] = args.guild_home
+        guild_home = f"export GUILD_HOME='{args.guild_home}'"
+    else:
+        guild_home = ""
+
+    ### read runs...
+    runs = None
+    if args.guildfilter:
+        runs = Runs.guild_read(args.guildfilter)
+    elif args.runids:
+        runs = Runs.bare_ids_to_json(args.runids)
+    elif args.runsfile:
+        runs = Runs.read_json(args.runsfile)
+
+    if args.store_runs:
+        Runs.store_json(runs, args.store_runs)
+    ####
+
+    # sbatch or execute:
+    if args.exec:
+        print("execute runs!")
+        Runs.execute(runs, args.jobs_per_gpu, dry_run=args.dry_run)
+    elif args.sbatch:
+        print("should create sbatch...")
+
+        nr_of_runs = len(runs)
+        worker_slots_per_node = NUM_GPUS * args.jobs_per_gpu
+        frac_num_nodes = nr_of_runs / worker_slots_per_node
+        full_nodes = int(math.ceil(frac_num_nodes))
+        nr_of_nodes = args.use_nodes
+        print(f"num jobs: {nr_of_runs}")
+        print(f"slots per gpu: {args.jobs_per_gpu}")
+        if args.use_nodes > full_nodes:
+            raise RuntimeError((
+                f"We have {nr_of_runs} runs, {args.jobs_per_gpu} jobs/GPU, {NUM_GPUS} GPUs, "
+                f"and thus {worker_slots_per_node} slots per node. "
+                f"{args.use_nodes} are requested, but we can fill only {frac_num_nodes} "
+                f"({full_nodes}) nodes. Use less jobs per node or less nodes."
+            ))
+        if nr_of_nodes < 1:
+            over_count = int(abs(args.use_nodes))
+            nr_of_nodes = int(math.ceil((nr_of_runs / worker_slots_per_node) / over_count))
+            print((f"Automatic node calculation used, every node should execute {over_count}"
+                   f" jobs sequentially, thus: {nr_of_nodes} nodes"))
+
+        # todo chunk heer
+        nr_of_jobs_per_node = int(math.ceil(nr_of_runs / nr_of_nodes))
+        joblens = ', '.join([str(len(chunk_runs)) for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node))])
+        print(f"jobs per node: [ {joblens} ]")
+
+        if not args.sbatch_yes:
+            if not yesno("Continue?"):
+                sys.exit(-1)
+        for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
+            chunk_runids = [run["id"] for run in chunk_runs]
+            slurm_content = slurm_template.substitute(
+                user=getpass.getuser(),
+                cmd=f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu}",
+                jobname=f"{args.jobname}-{i}",
+                guild_home=guild_home
+            )
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as sbash:
+                sbash.write(slurm_content)
+                sbash.flush()
+                command = f"sbatch --nice={args.nice} {sbash.name} "
+                if args.sbatch_verbose:
+                    print(f"\n--- sbatch file for job {i}, {sbash.name} ---\n")
+                    subprocess.run(f"cat {sbash.name}", shell=True)
+                print(f"command: {command}")
+                if not args.dry_run:
+                    subprocess.run(command, shell=True)
+                pass # create batch with runs here.
+        print(f"\n=== {i+1} job files===\n")
+
+if __name__ == "__main__":
+    main()

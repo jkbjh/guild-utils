@@ -22,17 +22,16 @@ import traceback
 
 libc = ctypes.CDLL("libc.so.6")
 
-NUM_GPUS = 4
 slurm_template = string.Template(
-    f"""
+    """
 #!/bin/bash -l
 #SBATCH --partition=IFIgpu
 #SBATCH --job-name=$jobname
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=${{user}}@uibk.ac.at
 #SBATCH --account=iis ##change to your group
-#SBATCH -n 27 # number of cores
-#SBATCH --gres gpu:{NUM_GPUS} # number of gpus
+#SBATCH -n $num_cores # number of cores
+#SBATCH --gres gpu:$num_gpus # number of gpus
 #SBATCH --exclusive=user
 #SBATCH -o /scratch/${{user}}/slurm_logs/slurm.%N.%j.out # STDOUT
 #SBATCH -e /scratch/${{user}}/slurm_logs/slurm.%N.%j.err # STDERR
@@ -173,7 +172,7 @@ class Runs:
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="select and schedule guild runs on a slurm cluster.")
     group_runsin = parser.add_mutually_exclusive_group()
     group_runsin.add_argument("--guildfilter", type=str, default=None, help="filter string for guild runs")
     group_runsin.add_argument("--runsfile", type=str, default=None, help="json file result of guild runs")
@@ -200,6 +199,8 @@ def main():
     parser.add_argument(
         "--use-nodes", type=int, default=-1, help="how many parallel sbatch files and thus nodes to use"
     )
+    parser.add_argument("--num-gpus", type=int, default=4, help="How many GPUs to request via slumr. Minimum is 1.")
+    parser.add_argument("--num-cpus", type=int, default=27, help="How many CPUs per job.")
     # NUMGPUS = 4  # this is the number of gpus in the node.
     args = parser.parse_args()
 
@@ -230,7 +231,7 @@ def main():
         print("should create sbatch...")
 
         nr_of_runs = len(runs)
-        worker_slots_per_node = NUM_GPUS * args.jobs_per_gpu
+        worker_slots_per_node = args.num_gpus * args.jobs_per_gpu
         frac_num_nodes = nr_of_runs / worker_slots_per_node
         full_nodes = int(math.ceil(frac_num_nodes))
         nr_of_nodes = args.use_nodes
@@ -239,7 +240,7 @@ def main():
         if args.use_nodes > full_nodes:
             raise RuntimeError(
                 (
-                    f"We have {nr_of_runs} runs, {args.jobs_per_gpu} jobs/GPU, {NUM_GPUS} GPUs, "
+                    f"We have {nr_of_runs} runs, {args.jobs_per_gpu} jobs/GPU, {args.num_gpus} GPUs, "
                     f"and thus {worker_slots_per_node} slots per node. "
                     f"{args.use_nodes} are requested, but we can fill only {frac_num_nodes} "
                     f"({full_nodes}) nodes. Use less jobs per node or less nodes."
@@ -267,9 +268,12 @@ def main():
             chunk_runids = [run["id"] for run in chunk_runs]
             slurm_content = slurm_template.substitute(
                 user=getpass.getuser(),
-                cmd=f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu}",
+                cmd=f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}",
                 jobname=f"{args.jobname}-{i}",
                 guild_home=guild_home,
+                num_gpus=args.num_gpus,
+                # num_cores=27,
+                num_cores=args.num_cpus,
             )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as sbash:
                 sbash.write(slurm_content)

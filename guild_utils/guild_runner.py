@@ -28,13 +28,13 @@ slurm_template = string.Template(
 #SBATCH --partition=IFIgpu
 #SBATCH --job-name=$jobname
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=${{user}}@uibk.ac.at
+#SBATCH --mail-user=${user}@uibk.ac.at
 #SBATCH --account=iis ##change to your group
-#SBATCH -n $num_cores # number of cores
-#SBATCH --gres gpu:$num_gpus # number of gpus
+#SBATCH -n ${num_cores} # number of cores
+#SBATCH --gres gpu:${num_gpus} # number of gpus
 #SBATCH --exclusive=user
-#SBATCH -o /scratch/${{user}}/slurm_logs/slurm.%N.%j.out # STDOUT
-#SBATCH -e /scratch/${{user}}/slurm_logs/slurm.%N.%j.err # STDERR
+#SBATCH -o /scratch/${user}/slurm_logs/slurm.%N.%j.out # STDOUT
+#SBATCH -e /scratch/${user}/slurm_logs/slurm.%N.%j.err # STDERR
 
 $guild_home
 

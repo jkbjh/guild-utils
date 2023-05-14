@@ -25,7 +25,8 @@ libc = ctypes.CDLL("libc.so.6")
 slurm_template = string.Template(
     """
 #!/bin/bash -l
-#SBATCH --partition=IFIgpu
+#SBATCH --partition=${partition}
+#SBATCH --exclude=${exclude_nodes}
 #SBATCH --job-name=$jobname
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=${user}@uibk.ac.at
@@ -191,6 +192,8 @@ def main():
     parser.add_argument("--jobs-per-gpu", type=int, default=5)
     parser.add_argument("--dry-run", action="store_true")
 
+    parser.add_argument("--partition", type=str, default="IFIgpu")
+    parser.add_argument("--exclude-nodes", type=str, default="headnode")
     parser.add_argument("--guild-home", type=str, default=None, help="GUILD_HOME directory")
     # sbatch additional parameters
     parser.add_argument("--jobname", type=str, default="guild-runner")
@@ -236,6 +239,7 @@ def main():
         nr_of_nodes = args.use_nodes
         print(f"num jobs: {nr_of_runs}")
         print(f"slots per gpu: {args.jobs_per_gpu}")
+        print(f"requested cpus: {args.num_cpus}")
         if args.use_nodes > full_nodes:
             raise RuntimeError(
                 (
@@ -273,6 +277,8 @@ def main():
                 num_gpus=args.num_gpus,
                 # num_cores=27,
                 num_cores=args.num_cpus,
+                partition=args.partition,
+                exclude_nodes=args.exclude_nodes,
             )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as sbash:
                 sbash.write(slurm_content)

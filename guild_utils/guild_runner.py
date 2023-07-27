@@ -36,6 +36,7 @@ slurm_template = string.Template(
 #SBATCH -o /scratch/${user}/slurm_logs/slurm.%N.%j.out # STDOUT
 #SBATCH -e /scratch/${user}/slurm_logs/slurm.%N.%j.err # STDERR
 
+printenv
 $guild_home
 
 $cmd

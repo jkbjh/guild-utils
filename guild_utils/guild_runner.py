@@ -75,7 +75,9 @@ def detect_singularity_and_create_command():
             singularity_bind = "-B " + os.environ["SINGULARITY_BIND"]
         else:
             singularity_bind = ""
-        cmd = f"singularity exec {singularity_bind} {singularity_container}"
+        # note: the --nv nvidia extensions warn when nvidia tools are
+        # not present, but does not fail
+        cmd = f"singularity exec --nv {singularity_bind} {singularity_container}"
         return cmd
 
 

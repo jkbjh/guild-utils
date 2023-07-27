@@ -66,6 +66,19 @@ def yesno(query, opt_true=("y", "yes"), opt_false=("n", "no")):
             return False
 
 
+def detect_singularity_and_create_command():
+    if not os.environ.get("SINGULARITY_COMMAND", ""):
+        return ""
+    else:
+        singularity_container = os.environ["SINGULARITY_CONTAINER"]
+        if os.environ["SINGULARITY_BIND"]:
+            singularity_bind = "-B " + os.environ["SINGULARITY_BIND"]
+        else:
+            singularity_bind = ""
+        cmd = f"singularity exec {singularity_bind} {singularity_container}"
+        return cmd
+
+
 # #@atexit.register
 # def kill_children(sig=signal.SIGINT):
 #     print("atexit!")
@@ -268,10 +281,12 @@ def main():
             if not yesno("Continue?"):
                 sys.exit(-1)
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
+            pre_command = detect_singularity_and_create_command()
+            pre_command = "" if not pre_command else pre_command + " "
             chunk_runids = [run["id"] for run in chunk_runs]
             slurm_content = slurm_template.substitute(
                 user=getpass.getuser(),
-                cmd=f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}",
+                cmd=f"{pre_command}{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}",
                 jobname=f"{args.jobname}-{i}",
                 guild_home=guild_home,
                 num_gpus=args.num_gpus,

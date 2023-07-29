@@ -27,11 +27,12 @@ def create_trial_args(args):
     return operation, trial_args
 
 
-def trial_args2trial_commands(operation, trial_args):
+def trial_args2trial_commands(operation, trial_args, tags=None):
+    tag_command = "" if tags is None else " " + " ".join([f"-t {tag}" for tag in tags]) + " "
     trial_commands = []
     for trial_arg in trial_args:
         flags = " ".join([f"{k}={v}" for k, v in trial_arg.items()])
-        trial_commands.append(f"guild run --yes {operation} --stage {flags}")
+        trial_commands.append(f"guild run --yes {operation} --stage {flags} {tag_command}")
     return trial_commands
 
 
@@ -75,11 +76,25 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", default=False)
     parser.add_argument("--n-jobs", type=int, default=None)
+    parser.add_argument(
+        "-t",
+        "--tag",
+        action="append",
+        dest="tags",
+        default=[],
+        help="Add tags that should be passed to the guild run. Note that passing arguments",
+    )
+
+    for arg in guild_run_args:
+        if arg.startswith("-"):
+            raise parser.error(f"error {arg} flags cannot be passed to guild here.")
+
     pargs = parser.parse_args(stager_args)
 
     operation, trial_args = create_trial_args(guild_run_args)
-    trial_commands = trial_args2trial_commands(operation, trial_args)
+    trial_commands = trial_args2trial_commands(operation, trial_args, tags=pargs.tags)
     print("\n".join(trial_commands))
+
     if not pargs.dry_run:
         parallel_stage_trials(trial_commands, n_jobs=pargs.n_jobs)
 

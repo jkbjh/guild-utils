@@ -67,20 +67,25 @@ def yesno(query, opt_true=("y", "yes"), opt_false=("n", "no")):
             return False
 
 
-def detect_singularity_and_create_command():
+def is_in_singularity():
     if not os.environ.get("SINGULARITY_COMMAND", ""):
-        return ""
+        return False
     else:
-        singularity_container = os.environ["SINGULARITY_CONTAINER"]
-        if os.environ["SINGULARITY_BIND"]:
-            singularity_bind = "-B " + os.environ["SINGULARITY_BIND"]
-        else:
-            singularity_bind = ""
-        # note: the --nv nvidia extensions warn when nvidia tools are
-        # not present, but does not fail
-        path = os.environ["PATH"]
-        cmd = f"singularity exec --env PATH={path} --nv {singularity_bind} {singularity_container} /usr/bin/bash -c "
-        return cmd
+        return True
+
+
+def with_singularity(command):
+    singularity_container = os.environ["SINGULARITY_CONTAINER"]
+    if os.environ["SINGULARITY_BIND"]:
+        singularity_bind = "-B " + os.environ["SINGULARITY_BIND"]
+    else:
+        singularity_bind = ""
+    # note: the --nv nvidia extensions warn when nvidia tools are
+    # not present, but does not fail
+    path = os.environ["PATH"]
+    shlex_command = shlex.quote(command)
+    cmd = f"singularity exec --env PATH={path} --nv {singularity_bind} {singularity_container} /usr/bin/bash -c {shlex_command}"
+    return cmd
 
 
 # #@atexit.register
@@ -285,12 +290,13 @@ def main():
             if not yesno("Continue?"):
                 sys.exit(-1)
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
-            pre_command = detect_singularity_and_create_command()
-            pre_command = "" if not pre_command else pre_command + " "
             chunk_runids = [run["id"] for run in chunk_runs]
+            command = f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
+            if is_in_singularity():
+                command = with_singularity(command)
             slurm_content = slurm_template.substitute(
                 user=getpass.getuser(),
-                cmd=f"{pre_command}{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}",
+                cmd=command,
                 jobname=f"{args.jobname}-{i}",
                 guild_home=guild_home,
                 num_gpus=args.num_gpus,

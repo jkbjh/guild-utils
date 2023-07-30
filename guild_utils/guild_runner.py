@@ -84,7 +84,7 @@ def with_singularity(command):
     # not present, but does not fail
     path = os.environ["PATH"]
     shlex_command = shlex.quote(command)
-    cmd = f"singularity exec --env PATH={path} --nv {singularity_bind} {singularity_container} /usr/bin/bash -c {shlex_command}"
+    cmd = f"singularity exec --env PATH={path} --nv {singularity_bind} {singularity_container} /usr/bin/bash -i -c {shlex_command}"
     return cmd
 
 

@@ -305,7 +305,7 @@ def main():
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
             chunk_runids = [run["id"] for run in chunk_runs]
             flags_passthrough = []
-            if args.use_maps:
+            if args.use_mps:
                 flags_passthrough.append("--use-mps")
             if args.convert_cuda_visible_uuids:
                 flags_passthrough.append("--convert-cuda-visible-uuids")

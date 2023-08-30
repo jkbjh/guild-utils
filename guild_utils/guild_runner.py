@@ -18,7 +18,7 @@ import time
 import traceback
 from contextlib import nullcontext
 
-from . import mps_controller
+from guild_utils import mps_controller
 
 # import psutil
 # import atexit

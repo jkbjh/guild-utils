@@ -261,7 +261,7 @@ def main():
     # sbatch or execute:
     if args.exec:
         if args.convert_cuda_visible_uuids:
-            cv_util.convert_cuda_visible_uuids(os.environ)
+            cv_util.convert_cuda_visible_devices(os.environ)
         print("execute runs!")
         Runs.execute(runs, args.jobs_per_gpu, dry_run=args.dry_run, use_mps=args.use_mps)
     elif args.sbatch:

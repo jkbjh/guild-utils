@@ -189,14 +189,14 @@ class Runs:
             ]
             threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
 
-        # block until all tasks are done
-        time.sleep(3)
-        print("-------\n" * 10)
-        print(f"PID: {os.getpid()}")
-        print("Waiting for queue")
-        run_queue.join()
-        print("All work completed")
-        threads.clear()
+            # block until all tasks are done
+            time.sleep(3)
+            print("-------\n" * 10)
+            print(f"PID: {os.getpid()}")
+            print("Waiting for queue")
+            run_queue.join()
+            print("All work completed")
+            threads.clear()
 
 
 def main():
@@ -298,7 +298,7 @@ def main():
                 sys.exit(-1)
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
             chunk_runids = [run["id"] for run in chunk_runs]
-            use_mps_flag = "" if not args.use_mps else "--use-mps"
+            use_mps_flag = "--use-mps" if args.use_mps else ""
             command = f"{sys.executable} {__file__} --exec {use_mps_flag} --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
             if is_in_singularity():
                 command = with_singularity(command)

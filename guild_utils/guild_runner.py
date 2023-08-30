@@ -16,6 +16,9 @@ import tempfile
 import threading
 import time
 import traceback
+from contextlib import nullcontext
+
+from . import mps_controller
 
 # import psutil
 # import atexit
@@ -164,7 +167,7 @@ class Runs:
             json.dump(runs, fobj)
 
     @staticmethod
-    def execute(runs, jobs_per_gpu, dry_run=False):
+    def execute(runs, jobs_per_gpu, dry_run=False, use_mps=False):
         # retrieve CUDA Device settings
         CUDA_VISIBLE_DEVICES_str = (
             re.sub(",+", ",", os.environ.get("CUDA_VISIBLE_DEVICES", "").replace(" ", ","))
@@ -176,12 +179,15 @@ class Runs:
         for run in runs:
             run_queue.put(run)
 
-        workers = [
-            Worker(gpu=gpu, thread_num=threadnum, queue=run_queue, dry_run=dry_run)
-            for gpu in CUDA_VISIBLE_DEVICES
-            for threadnum in range(jobs_per_gpu)
-        ]
-        threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
+        with mps_controller.make_mps_controller() if use_mps else nullcontext() as mps:
+            if use_mps:
+                os.environ.update(mps.get_env_keys())
+            workers = [
+                Worker(gpu=gpu, thread_num=threadnum, queue=run_queue, dry_run=dry_run)
+                for gpu in CUDA_VISIBLE_DEVICES
+                for threadnum in range(jobs_per_gpu)
+            ]
+            threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
 
         # block until all tasks are done
         time.sleep(3)
@@ -209,6 +215,7 @@ def main():
     group_execute.add_argument("--sbatch", action="store_true")
     parser.add_argument("--sbatch-yes", action="store_true")
     parser.add_argument("--sbatch-verbose", action="store_true")
+    parser.add_argument("--use-mps", action="store_true", help="Should an nvidia-cuda-mps-control daemon be launched?")
     group_execute.add_argument("--exec", action="store_true")
 
     parser.add_argument("--jobs-per-gpu", type=int, default=5)
@@ -250,7 +257,7 @@ def main():
     # sbatch or execute:
     if args.exec:
         print("execute runs!")
-        Runs.execute(runs, args.jobs_per_gpu, dry_run=args.dry_run)
+        Runs.execute(runs, args.jobs_per_gpu, dry_run=args.dry_run, use_mps=args.use_mps)
     elif args.sbatch:
         print("should create sbatch...")
 
@@ -291,7 +298,8 @@ def main():
                 sys.exit(-1)
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
             chunk_runids = [run["id"] for run in chunk_runs]
-            command = f"{sys.executable} {__file__} --exec --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
+            use_mps_flag = "" if not args.use_mps else "--use-mps"
+            command = f"{sys.executable} {__file__} --exec {use_mps_flag} --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
             if is_in_singularity():
                 command = with_singularity(command)
             slurm_content = slurm_template.substitute(

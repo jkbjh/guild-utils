@@ -18,6 +18,7 @@ import time
 import traceback
 from contextlib import nullcontext
 
+from guild_utils import cv_util
 from guild_utils import mps_controller
 
 # import psutil
@@ -215,6 +216,9 @@ def main():
     group_execute.add_argument("--sbatch", action="store_true")
     parser.add_argument("--sbatch-yes", action="store_true")
     parser.add_argument("--sbatch-verbose", action="store_true")
+    parser.add_argument(
+        "--convert-cuda-visible-uuids", action="store_true", help="Use nvidia-smi to convert visible devices to uuids."
+    )
     parser.add_argument("--use-mps", action="store_true", help="Should an nvidia-cuda-mps-control daemon be launched?")
     group_execute.add_argument("--exec", action="store_true")
 
@@ -256,6 +260,8 @@ def main():
 
     # sbatch or execute:
     if args.exec:
+        if args.convert_cuda_visible_uuids:
+            cv_util.convert_cuda_visible_uuids(os.environ)
         print("execute runs!")
         Runs.execute(runs, args.jobs_per_gpu, dry_run=args.dry_run, use_mps=args.use_mps)
     elif args.sbatch:
@@ -298,8 +304,13 @@ def main():
                 sys.exit(-1)
         for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
             chunk_runids = [run["id"] for run in chunk_runs]
-            use_mps_flag = "--use-mps" if args.use_mps else ""
-            command = f"{sys.executable} {__file__} --exec {use_mps_flag} --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
+            flags_passthrough = []
+            if args.use_maps:
+                flags_passthrough.append("--use-mps")
+            if args.convert_cuda_visible_uuids:
+                flags_passthrough.append("--convert-cuda-visible-uuids")
+            flags_passthrough_string = " " + " ".join(flags_passthrough) + " "
+            command = f"{sys.executable} {__file__} --exec {flags_passthrough_string} --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
             if is_in_singularity():
                 command = with_singularity(command)
             slurm_content = slurm_template.substitute(

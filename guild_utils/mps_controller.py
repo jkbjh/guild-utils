@@ -58,7 +58,10 @@ class MPSController:
         return subprocess.check_output(f"echo {cmd} | nvidia-cuda-mps-control", env=env, shell=True)
 
     def kill(self):
-        os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+        try:
+            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass  # okay, already dead.
         self.process.wait()
 
     def get_env_keys(self):

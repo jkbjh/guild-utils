@@ -59,7 +59,7 @@ class MPSController:
 
     def kill(self):
         try:
-            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
         except ProcessLookupError:
             pass  # okay, already dead.
         self.process.wait()

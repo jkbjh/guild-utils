@@ -41,7 +41,7 @@ class MPSController:
         env = os.environ.copy()
         env["CUDA_MPS_PIPE_DIRECTORY"] = self.pipe_dir
         # self.process = subprocess.Popen(["nvidia-cuda-mps-control", "-f"], env=env, preexec_fn=os.setsid)
-        self.process = subprocess.Popen(["nvidia-cuda-mps-control", "-f"], env=env, preexec_fn=set_pdeathsig)
+        self.process = subprocess.Popen(["nvidia-cuda-mps-control", "-f"], env=env, preexec_fn=set_pdeathsig())
         # wait for the server to start.
         for i in range(5):
             try:

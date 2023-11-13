@@ -29,8 +29,8 @@ The staged runs can then be scheduled on the slurm cluster using the `guild-slur
 
 ```
 $ guild-slurm-runner --help
-usage: guild-slurm-runner [-h] [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]] [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes] [--sbatch-verbose] [--exec] [--jobs-per-gpu JOBS_PER_GPU] [--dry-run]
-                          [--partition PARTITION] [--exclude-nodes EXCLUDE_NODES] [--guild-home GUILD_HOME] [--jobname JOBNAME] [--nice NICE] [--use-nodes USE_NODES] [--num-gpus NUM_GPUS] [--num-cpus NUM_CPUS]
+usage: guild-slurm-runner [-h] [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]] [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes] [--sbatch-verbose] [--convert-cuda-visible-uuids] [--use-mps] [--exec]
+                          [--jobs-per-gpu JOBS_PER_GPU] [--dry-run] [--partition PARTITION] [--exclude-nodes EXCLUDE_NODES] [--guild-home GUILD_HOME] [--jobname JOBNAME] [--nice NICE] [--use-nodes USE_NODES] [--num-gpus NUM_GPUS] [--num-cpus NUM_CPUS]
 
 select and schedule guild runs on a slurm cluster.
 
@@ -45,6 +45,9 @@ options:
   --sbatch
   --sbatch-yes
   --sbatch-verbose
+  --convert-cuda-visible-uuids
+                        Use nvidia-smi to convert visible devices to uuids.
+  --use-mps             Should an nvidia-cuda-mps-control daemon be launched?
   --exec
   --jobs-per-gpu JOBS_PER_GPU
   --dry-run
@@ -58,4 +61,5 @@ options:
                         how many parallel sbatch files and thus nodes to use
   --num-gpus NUM_GPUS   How many GPUs to request via slumr. Minimum is 1.
   --num-cpus NUM_CPUS   How many CPUs per job.
+
 ```

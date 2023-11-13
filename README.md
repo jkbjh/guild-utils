@@ -1,6 +1,6 @@
 # guild_utils
 
-This repository contains utilities to use guild on a slurm based
+This repository contains utilities to use [guild](https://guild.ai/) on a [slurm](https://slurm.schedmd.com/) based
 cluster.  It needs to be installed in the same virtual environment as
 guild (and the experiment code).
 

@@ -1,6 +1,6 @@
 # guild_utils
 
-This repository contains utilities to use guild on a slurm based
+This repository contains utilities to use [guild](https://guild.ai/) on a [slurm](https://slurm.schedmd.com/) based
 cluster.  It needs to be installed in the same virtual environment as
 guild (and the experiment code).
 
@@ -67,4 +67,5 @@ options:
                         how many parallel sbatch files and thus nodes to use (default: -1)
   --num-gpus NUM_GPUS   How many GPUs to request via slurm. Minimum is 1. (default: 4)
   --num-cpus NUM_CPUS   How many CPUs per job. (default: 27)
+
 ```

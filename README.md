@@ -29,33 +29,42 @@ The staged runs can then be scheduled on the slurm cluster using the `guild-slur
 
 ```
 $ guild-slurm-runner --help
-usage: guild-slurm-runner [-h] [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]] [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes] [--sbatch-verbose] [--exec] [--jobs-per-gpu JOBS_PER_GPU] [--dry-run]
-                          [--partition PARTITION] [--exclude-nodes EXCLUDE_NODES] [--guild-home GUILD_HOME] [--jobname JOBNAME] [--nice NICE] [--use-nodes USE_NODES] [--num-gpus NUM_GPUS] [--num-cpus NUM_CPUS]
+usage: guild-slurm-runner [-h] [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]] [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes] [--sbatch-verbose] [--convert-cuda-visible-uuids] [--use-mps] [--exec]
+                          [--jobs-per-gpu JOBS_PER_GPU] [--dry-run] [--partition PARTITION] [--exclude-nodes EXCLUDE_NODES] [--guild-home GUILD_HOME] [--create-template CREATE_TEMPLATE] [--template-file TEMPLATE_FILE] [--list-templates]
+                          [--jobname JOBNAME] [--nice NICE] [--use-nodes USE_NODES] [--num-gpus NUM_GPUS] [--num-cpus NUM_CPUS]
 
 select and schedule guild runs on a slurm cluster.
 
 options:
   -h, --help            show this help message and exit
   --guildfilter GUILDFILTER
-                        filter string for guild runs
-  --runsfile RUNSFILE   json file result of guild runs
+                        filter string for guild runs (default: None)
+  --runsfile RUNSFILE   json file result of guild runs (default: None)
   --runids RUNIDS [RUNIDS ...]
   --store-runs STORE_RUNS
-                        filename to write filtered runs to
+                        filename to write filtered runs to (default: None)
   --sbatch
   --sbatch-yes
   --sbatch-verbose
+  --convert-cuda-visible-uuids
+                        Use nvidia-smi to convert visible devices to uuids. (default: False)
+  --use-mps             Should an nvidia-cuda-mps-control daemon be launched? (default: False)
   --exec
   --jobs-per-gpu JOBS_PER_GPU
   --dry-run
   --partition PARTITION
   --exclude-nodes EXCLUDE_NODES
   --guild-home GUILD_HOME
-                        GUILD_HOME directory
+                        GUILD_HOME directory (default: None)
+  --create-template CREATE_TEMPLATE
+                        Create a template (choose template from a list) (default: None)
+  --template-file TEMPLATE_FILE
+                        Path to sbatch (string.Template) template (default: ~/.guild_utils_sbatch_template)
+  --list-templates
   --jobname JOBNAME
   --nice NICE
   --use-nodes USE_NODES
-                        how many parallel sbatch files and thus nodes to use
-  --num-gpus NUM_GPUS   How many GPUs to request via slumr. Minimum is 1.
-  --num-cpus NUM_CPUS   How many CPUs per job.
+                        how many parallel sbatch files and thus nodes to use (default: -1)
+  --num-gpus NUM_GPUS   How many GPUs to request via slurm. Minimum is 1. (default: 4)
+  --num-cpus NUM_CPUS   How many CPUs per job. (default: 27)
 ```

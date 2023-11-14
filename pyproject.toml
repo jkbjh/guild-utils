@@ -41,5 +41,6 @@ include = '''
 
 
 [project.scripts]
-guild-utils-stager = "guild_utils.stager:main"
+guild-utils-stager = "guild_utils.old_stager:main"  # kept for backward compatibility
+guild-parallel-stager = "guild_utils.parallel_stager:main"
 guild-slurm-runner = "guild_utils.guild_runner:main"

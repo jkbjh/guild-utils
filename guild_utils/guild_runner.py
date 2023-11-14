@@ -9,7 +9,6 @@ import queue
 import re
 import shlex
 import signal
-import string
 import subprocess
 import sys
 import tempfile
@@ -20,34 +19,14 @@ from contextlib import nullcontext
 
 from guild_utils import cv_util
 from guild_utils import mps_controller
+from guild_utils import sbatch_template
 
 # import psutil
 # import atexit
 
 libc = ctypes.CDLL("libc.so.6")
 
-slurm_template = string.Template(
-    """
-#!/bin/bash -l
-#SBATCH --partition=${partition}
-#SBATCH --exclude=${exclude_nodes}
-#SBATCH --job-name=$jobname
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=${user}@uibk.ac.at
-#SBATCH --account=iis ##change to your group
-#SBATCH -n ${num_cores} # number of cores
-#SBATCH --gres gpu:${num_gpus} # number of gpus
-#SBATCH -o /scratch/${user}/slurm_logs/slurm.%N.%j.out # STDOUT
-#SBATCH -e /scratch/${user}/slurm_logs/slurm.%N.%j.err # STDERR
-
-printenv
-$guild_home
-
-$cmd
-
-wait
-""".strip()  # trailing/leading
-)
+slurm_template = sbatch_template.slurm_template
 
 
 def chunk(sequence, chunksize):
@@ -228,16 +207,21 @@ def main():
     parser.add_argument("--partition", type=str, default="IFIgpu")
     parser.add_argument("--exclude-nodes", type=str, default="headnode")
     parser.add_argument("--guild-home", type=str, default=None, help="GUILD_HOME directory")
+
     # sbatch additional parameters
     parser.add_argument("--jobname", type=str, default="guild-runner")
     parser.add_argument("--nice", type=int, default=0)
     parser.add_argument(
         "--use-nodes", type=int, default=-1, help="how many parallel sbatch files and thus nodes to use"
     )
-    parser.add_argument("--num-gpus", type=int, default=4, help="How many GPUs to request via slumr. Minimum is 1.")
+    parser.add_argument("--num-gpus", type=int, default=4, help="How many GPUs to request via slurm. Minimum is 1.")
     parser.add_argument("--num-cpus", type=int, default=27, help="How many CPUs per job.")
-    # NUMGPUS = 4  # this is the number of gpus in the node.
+
     args = parser.parse_args()
+
+    if args.use_mps and not args.convert_cuda_visible_uuids:
+        print("NOTE: '--use-mps' implies  '--convert-cuda-visible-uuids'")
+        args.convert_cuda_visible_uuids = True
 
     if args.guild_home:
         os.environ["GUILD_HOME"] = args.guild_home

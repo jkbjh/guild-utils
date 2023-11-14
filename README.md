@@ -14,7 +14,7 @@ or, in case of a batched operation such as a grid search:
 guild run --stage-trials ...
 ```
 
-The utils also contain the `guild-utils-stager`, which internally uses
+The utils also contain the `guild-parallel-stager`, which internally uses
 ```
 guild run --save-trials path_to.csv ...
 ```
@@ -22,7 +22,7 @@ to generate runs, but creates the runs independently (not a main batch operation
 
 Example usage:
 ```
-guild-utils-stager my-guild-operation my-parameter=[value1,value2,value3] ...
+guild-parallel-stager my-guild-operation my-parameter=[value1,value2,value3] ...
 ```
 
 The staged runs can then be scheduled on the slurm cluster using the `guild-slurm-runner`:

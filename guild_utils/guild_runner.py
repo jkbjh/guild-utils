@@ -1,7 +1,7 @@
 import argparse
 import copy
 import ctypes
-import getpass
+import grp
 import json
 import math
 import os
@@ -19,14 +19,12 @@ from contextlib import nullcontext
 
 from guild_utils import cv_util
 from guild_utils import mps_controller
-from guild_utils import sbatch_template
+from guild_utils.sbatch_template import SlurmTemplate
 
 # import psutil
 # import atexit
 
 libc = ctypes.CDLL("libc.so.6")
-
-slurm_template = sbatch_template.slurm_template
 
 
 def chunk(sequence, chunksize):
@@ -69,6 +67,12 @@ def with_singularity(command):
     shlex_command = shlex.quote(command)
     cmd = f"singularity exec --env PATH={path} --nv {singularity_bind} {singularity_container} /usr/bin/bash -i -c {shlex_command}"
     return cmd
+
+
+def get_user_and_group():
+    user = os.getlogin()
+    group = grp.getgrgid(os.getgid()).gr_name
+    return user, group
 
 
 # #@atexit.register
@@ -180,7 +184,10 @@ class Runs:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="select and schedule guild runs on a slurm cluster.")
+    parser = argparse.ArgumentParser(
+        description="select and schedule guild runs on a slurm cluster.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     group_runsin = parser.add_mutually_exclusive_group()
     group_runsin.add_argument("--guildfilter", type=str, default=None, help="filter string for guild runs")
     group_runsin.add_argument("--runsfile", type=str, default=None, help="json file result of guild runs")
@@ -209,6 +216,16 @@ def main():
     parser.add_argument("--guild-home", type=str, default=None, help="GUILD_HOME directory")
 
     # sbatch additional parameters
+    parser.add_argument(
+        "--create-template", type=str, required=False, help="Create a template (choose template from a list)"
+    )
+    parser.add_argument(
+        "--template-file",
+        type=str,
+        default=SlurmTemplate.get_default_template_filename(),
+        help="Path to sbatch (string.Template) template",
+    )
+    parser.add_argument("--list-templates", action="store_true")
     parser.add_argument("--jobname", type=str, default="guild-runner")
     parser.add_argument("--nice", type=int, default=0)
     parser.add_argument(
@@ -228,6 +245,16 @@ def main():
         guild_home = f"export GUILD_HOME='{args.guild_home}'"
     else:
         guild_home = ""
+
+    # sbatch templates
+    if args.list_templates:
+        SlurmTemplate.print_defaults()
+        parser.exit("")
+
+    if args.create_template:
+        SlurmTemplate.create_template(args.template_file, args.create_template)
+        SlurmTemplate.print_template(args.create_template)
+    slurm_template = SlurmTemplate(args.template_file)
 
     # ---- read runs...
     runs = None
@@ -278,7 +305,7 @@ def main():
                 )
             )
 
-        # todo chunk heer
+        # Chunking
         nr_of_jobs_per_node = int(math.ceil(nr_of_runs / nr_of_nodes))
         joblens = ", ".join([str(len(chunk_runs)) for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node))])
         print(f"jobs per node: [ {joblens} ]")
@@ -297,16 +324,17 @@ def main():
             command = f"{sys.executable} {__file__} --exec {flags_passthrough_string} --runids {' '.join(chunk_runids)} --jobs-per-gpu {args.jobs_per_gpu} --num-gpus {args.num_gpus} --num-cpus {args.num_cpus}"
             if is_in_singularity():
                 command = with_singularity(command)
+            username, groupname = get_user_and_group()
             slurm_content = slurm_template.substitute(
-                user=getpass.getuser(),
+                user=username,
                 cmd=command,
                 jobname=f"{args.jobname}-{i}",
                 guild_home=guild_home,
                 num_gpus=args.num_gpus,
-                # num_cores=27,
                 num_cores=args.num_cpus,
                 partition=args.partition,
                 exclude_nodes=args.exclude_nodes,
+                group=groupname,
             )
             with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as sbash:
                 sbash.write(slurm_content)

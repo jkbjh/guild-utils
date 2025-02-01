@@ -151,7 +151,7 @@ class Runs:
             json.dump(runs, fobj)
 
     @staticmethod
-    def execute(runs, jobs_per_gpu, dry_run=False, use_mps=False):
+    def execute(runs, workers_per_gpu, dry_run=False, use_mps=False):
         # retrieve CUDA Device settings
         CUDA_VISIBLE_DEVICES_str = (
             re.sub(",+", ",", os.environ.get("CUDA_VISIBLE_DEVICES", "").replace(" ", ","))
@@ -169,7 +169,7 @@ class Runs:
             workers = [
                 Worker(gpu=gpu, thread_num=threadnum, queue=run_queue, dry_run=dry_run)
                 for gpu in CUDA_VISIBLE_DEVICES
-                for threadnum in range(jobs_per_gpu)
+                for threadnum in range(workers_per_gpu)
             ]
             threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
 

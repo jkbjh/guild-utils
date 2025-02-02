@@ -15,6 +15,8 @@ import tempfile
 import threading
 import time
 import traceback
+import warnings
+from collections.abc import Sequence
 from contextlib import nullcontext
 
 from guild_utils import cv_util
@@ -27,9 +29,30 @@ from guild_utils.sbatch_template import SlurmTemplate
 libc = ctypes.CDLL("libc.so.6")
 
 
+def is_sequence_but_not_string(obj):
+    return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes, bytearray))
+
+
+def deprecated_argument(type_converter, argument_name=""):
+    def deprecated_argument(value):
+        warnings.warn(f"The argument {argument_name} is deprecated.", DeprecationWarning)
+        return type_converter(value)
+
+    return deprecated_argument
+
+
 def chunk(sequence, chunksize):
     for i in range(0, len(sequence), chunksize):
         yield sequence[i : i + chunksize]
+
+
+def create_worker_kwargs(cuda_visible_devices, workers_per_gpu, **kwargs):
+    workers_kwargs = [
+        dict(gpus=gpu, thread_num=threadnum, **kwargs)
+        for gpu in cuda_visible_devices
+        for threadnum in range(workers_per_gpu)
+    ]
+    return workers_kwargs
 
 
 def set_pdeathsig(sig=signal.SIGTERM):
@@ -94,8 +117,10 @@ def get_user_and_group():
 
 
 class Worker(object):
-    def __init__(self, gpu, thread_num, queue, dry_run=False):
-        self.gpu = gpu
+    def __init__(self, gpus, thread_num, queue, dry_run=False):
+        if is_sequence_but_not_string(gpus):
+            gpus = ",".join(gpus)
+        self.gpus = gpus
         self.queue = queue
         self.thread_num = thread_num
         self.dry_run = dry_run
@@ -106,7 +131,7 @@ class Worker(object):
             runid = item["id"]
             print(f"Working on {runid}")
             env = copy.deepcopy(os.environ)
-            env["CUDA_VISIBLE_DEVICES"] = self.gpu
+            env["CUDA_VISIBLE_DEVICES"] = self.gpus
             try:
                 print(f"guild run -y --restart {runid}")
                 # subprocess.run(f"guild run -y --restart {runid}", shell=True)
@@ -157,7 +182,8 @@ class Runs:
             re.sub(",+", ",", os.environ.get("CUDA_VISIBLE_DEVICES", "").replace(" ", ","))
         ).strip()
         assert CUDA_VISIBLE_DEVICES_str, f"CUDA_VISIBLE_DEVICES does not show devices: {CUDA_VISIBLE_DEVICES_str}"
-        CUDA_VISIBLE_DEVICES = CUDA_VISIBLE_DEVICES_str.split(",")
+        # CUDA_VISIBLE_DEVICES = CUDA_VISIBLE_DEVICES_str.split(",")
+        cuda_visible_devices = CUDA_VISIBLE_DEVICES_str.split(",")
 
         run_queue = queue.Queue()
         for run in runs:
@@ -166,11 +192,14 @@ class Runs:
         with mps_controller.make_mps_controller() if use_mps else nullcontext() as mps:
             if use_mps:
                 os.environ.update(mps.get_env_keys())
-            workers = [
-                Worker(gpu=gpu, thread_num=threadnum, queue=run_queue, dry_run=dry_run)
-                for gpu in CUDA_VISIBLE_DEVICES
-                for threadnum in range(workers_per_gpu)
-            ]
+
+            worker_kwargs = create_worker_kwargs(
+                cuda_visible_devices=cuda_visible_devices,
+                workers_per_gpu=workers_per_gpu,
+                queue=run_queue,
+                dry_run=dry_run,
+            )
+            workers = [Worker(**kwargs) for kwargs in worker_kwargs]
             threads = [threading.Thread(target=worker.do_work, daemon=True).start() for worker in workers]
 
             # block until all tasks are done

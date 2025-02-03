@@ -226,7 +226,8 @@ class Runs:
         ).strip()
         if number_of_gpus > 0:
             assert CUDA_VISIBLE_DEVICES_str, f"CUDA_VISIBLE_DEVICES does not show devices: {CUDA_VISIBLE_DEVICES_str}"
-        cuda_visible_devices = CUDA_VISIBLE_DEVICES_str.split(",")
+        cuda_visible_devices = CUDA_VISIBLE_DEVICES_str.split(",") if CUDA_VISIBLE_DEVICES_str else []
+
         if number_of_gpus is not None:
             if len(cuda_visible_devices) >= number_of_gpus:
                 raise RuntimeError(f"expected {number_of_gpus} required, but {len(cuda_visible_devices)} available")
@@ -288,7 +289,7 @@ def main():
     parser.add_argument(
         "--workers-per-job",
         type=int,
-        default=5,
+        default=1,
         help=("how many workers per slurm job. " "These will be distributed evenly across GPUs or vice versa."),
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -311,8 +312,8 @@ def main():
     parser.add_argument("--jobname", type=str, default="guild-runner")
     parser.add_argument("--nice", type=int, default=0)
     parser.add_argument("--use-jobs", type=int, default=-1, help="how many parallel sbatch files and thus jobs to use")
-    parser.add_argument("--num-gpus", type=int, default=4, help="How many GPUs to request via slurm. Minimum is 1.")
-    parser.add_argument("--num-cpus", type=int, default=27, help="How many CPUs per job.")
+    parser.add_argument("--num-gpus", type=int, default=1, help="How many GPUs to request via slurm. Minimum is 1.")
+    parser.add_argument("--num-cpus", type=int, default=1, help="How many CPUs per job.")
 
     args = parser.parse_args()
 

@@ -229,7 +229,7 @@ class Runs:
         cuda_visible_devices = CUDA_VISIBLE_DEVICES_str.split(",") if CUDA_VISIBLE_DEVICES_str else []
 
         if number_of_gpus is not None:
-            if len(cuda_visible_devices) >= number_of_gpus:
+            if len(cuda_visible_devices) != number_of_gpus:
                 raise RuntimeError(f"expected {number_of_gpus} required, but {len(cuda_visible_devices)} available")
 
         run_queue = queue.Queue()

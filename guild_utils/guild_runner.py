@@ -224,7 +224,8 @@ class Runs:
         CUDA_VISIBLE_DEVICES_str = (
             re.sub(",+", ",", os.environ.get("CUDA_VISIBLE_DEVICES", "").replace(" ", ","))
         ).strip()
-        assert CUDA_VISIBLE_DEVICES_str, f"CUDA_VISIBLE_DEVICES does not show devices: {CUDA_VISIBLE_DEVICES_str}"
+        if number_of_gpus > 0:
+            assert CUDA_VISIBLE_DEVICES_str, f"CUDA_VISIBLE_DEVICES does not show devices: {CUDA_VISIBLE_DEVICES_str}"
         cuda_visible_devices = CUDA_VISIBLE_DEVICES_str.split(",")
         if number_of_gpus is not None:
             if len(cuda_visible_devices) >= number_of_gpus:

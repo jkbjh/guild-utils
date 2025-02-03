@@ -242,7 +242,7 @@ class Runs:
 
             worker_kwargs = create_worker_kwargs(
                 cuda_visible_devices=cuda_visible_devices,
-                workers_per_gpu=workers_per_gpu,
+                workers_per_gpu_ratio=workers_per_gpu,
                 number_of_subjob_workers=number_of_subjob_workers,
                 queue=run_queue,
                 dry_run=dry_run,

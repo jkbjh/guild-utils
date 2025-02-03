@@ -29,13 +29,24 @@ The staged runs can then be scheduled on the slurm cluster using the `guild-slur
 
 ```
 $ guild-slurm-runner --help
-usage: guild-slurm-runner [-h] [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]] [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes] [--sbatch-verbose] [--convert-cuda-visible-uuids] [--use-mps] [--exec]
-                          [--jobs-per-gpu JOBS_PER_GPU] [--dry-run] [--partition PARTITION] [--exclude-nodes EXCLUDE_NODES] [--guild-home GUILD_HOME] [--create-template CREATE_TEMPLATE] [--template-file TEMPLATE_FILE] [--list-templates]
-                          [--jobname JOBNAME] [--nice NICE] [--use-nodes USE_NODES] [--num-gpus NUM_GPUS] [--num-cpus NUM_CPUS]
+usage: guild-slurm-runner [-h]
+                          [--guildfilter GUILDFILTER | --runsfile RUNSFILE | --runids RUNIDS [RUNIDS ...]]
+                          [--store-runs STORE_RUNS] [--sbatch] [--sbatch-yes]
+                          [--sbatch-verbose] [--convert-cuda-visible-uuids]
+                          [--use-mps] [--exec]
+                          [--workers-per-job WORKERS_PER_JOB] [--dry-run]
+                          [--partition PARTITION]
+                          [--exclude-nodes EXCLUDE_NODES]
+                          [--guild-home GUILD_HOME]
+                          [--create-template CREATE_TEMPLATE]
+                          [--template-file TEMPLATE_FILE] [--list-templates]
+                          [--jobname JOBNAME] [--nice NICE]
+                          [--use-jobs USE_JOBS] [--num-gpus NUM_GPUS]
+                          [--num-cpus NUM_CPUS]
 
 select and schedule guild runs on a slurm cluster.
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   --guildfilter GUILDFILTER
                         filter string for guild runs (default: None)
@@ -47,25 +58,32 @@ options:
   --sbatch-yes
   --sbatch-verbose
   --convert-cuda-visible-uuids
-                        Use nvidia-smi to convert visible devices to uuids. (default: False)
-  --use-mps             Should an nvidia-cuda-mps-control daemon be launched? (default: False)
+                        Use nvidia-smi to convert visible devices to uuids.
+                        (default: False)
+  --use-mps             Should an nvidia-cuda-mps-control daemon be launched?
+                        (default: False)
   --exec
-  --jobs-per-gpu JOBS_PER_GPU
+  --workers-per-job WORKERS_PER_JOB
+                        how many workers per slurm job. These will be
+                        distributed evenly across GPUs or vice versa.
+                        (default: 5)
   --dry-run
   --partition PARTITION
   --exclude-nodes EXCLUDE_NODES
   --guild-home GUILD_HOME
                         GUILD_HOME directory (default: None)
   --create-template CREATE_TEMPLATE
-                        Create a template (choose template from a list) (default: None)
+                        Create a template (choose template from a list)
+                        (default: None)
   --template-file TEMPLATE_FILE
-                        Path to sbatch (string.Template) template (default: ~/.guild_utils_sbatch_template)
+                        Path to sbatch (string.Template) template (default:
+                        ~/.guild_utils_sbatch_template)
   --list-templates
   --jobname JOBNAME
   --nice NICE
-  --use-nodes USE_NODES
-                        how many parallel sbatch files and thus nodes to use (default: -1)
-  --num-gpus NUM_GPUS   How many GPUs to request via slurm. Minimum is 1. (default: 4)
+  --use-jobs USE_JOBS   how many parallel sbatch files and thus jobs to use
+                        (default: -1)
+  --num-gpus NUM_GPUS   How many GPUs to request via slurm. Minimum is 1.
+                        (default: 4)
   --num-cpus NUM_CPUS   How many CPUs per job. (default: 27)
-
 ```

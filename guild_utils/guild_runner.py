@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from contextlib import nullcontext
 from fractions import Fraction
 
+import tqdm
 from guild_utils import cv_util
 from guild_utils import mps_controller
 from guild_utils.sbatch_template import SlurmTemplate
@@ -314,6 +315,12 @@ def main():
     parser.add_argument("--use-jobs", type=int, default=-1, help="how many parallel sbatch files and thus jobs to use")
     parser.add_argument("--num-gpus", type=int, default=1, help="How many GPUs to request via slurm. Minimum is 1.")
     parser.add_argument("--num-cpus", type=int, default=1, help="How many CPUs per job.")
+    parser.add_argument(
+        "--delay-start",
+        type=float,
+        default=0.1,
+        help="How many seconds to wait between launching slurm jobs, defaults to 0.1",
+    )
 
     args = parser.parse_args()
 
@@ -408,7 +415,7 @@ def main():
         if not args.sbatch_yes:
             if not yesno("Continue?"):
                 sys.exit(-1)
-        for i, chunk_runs in enumerate(chunk(runs, nr_of_jobs_per_node)):
+        for i, chunk_runs in tqdm.tqdm(list(enumerate(chunk(runs, nr_of_jobs_per_node)))):
             chunk_runids = [run["id"] for run in chunk_runs]
             flags_passthrough = []
             if args.use_mps:
@@ -442,6 +449,9 @@ def main():
                 if not args.dry_run:
                     subprocess.run(command, shell=True)
                 pass  # create batch with runs here.
+            print(f"waiting {args.delay_start} seconds.", end="")
+            time.sleep(args.delay_start)
+            print("\r                                            \r")
         print(f"\n=== {i+1} job files===\n")
 
 

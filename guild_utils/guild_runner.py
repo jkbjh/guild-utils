@@ -26,6 +26,8 @@ from guild_utils import cv_util
 from guild_utils import mps_controller
 from guild_utils.sbatch_template import SlurmTemplate
 
+from .helpers import yesno
+
 # import psutil
 # import atexit
 
@@ -99,15 +101,6 @@ def set_pdeathsig(sig=signal.SIGTERM):
         return libc.prctl(1, sig)
 
     return callable
-
-
-def yesno(query, opt_true=("y", "yes"), opt_false=("n", "no")):
-    while True:
-        answer = input(query + f" [{','.join(opt_true)}|{','.join(opt_false)}]").lower()
-        if answer in opt_true:
-            return True
-        elif answer in opt_false:
-            return False
 
 
 def is_in_singularity():

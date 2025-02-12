@@ -7,6 +7,8 @@ import joblib
 import pandas as pd
 import tqdm
 
+from .helpers import yesno
+
 
 def create_trial_args(args):
     operation = None
@@ -94,6 +96,10 @@ def main():
     operation, trial_args = create_trial_args(guild_run_args)
     trial_commands = trial_args2trial_commands(operation, trial_args, tags=pargs.tags)
     print("\n".join(trial_commands))
+
+    print(f"About to stage {len(trial_commands)} trials.")
+    if not yesno("Continue?"):
+        sys.exit(-1)
 
     if not pargs.dry_run:
         parallel_stage_trials(trial_commands, n_jobs=pargs.n_jobs)

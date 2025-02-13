@@ -24,9 +24,8 @@ from fractions import Fraction
 import tqdm
 from guild_utils import cv_util
 from guild_utils import mps_controller
+from guild_utils.helpers import yesno
 from guild_utils.sbatch_template import SlurmTemplate
-
-from .helpers import yesno
 
 # import psutil
 # import atexit

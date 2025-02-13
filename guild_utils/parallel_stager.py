@@ -6,8 +6,7 @@ import tempfile
 import joblib
 import pandas as pd
 import tqdm
-
-from .helpers import yesno
+from guild_utils.helpers import yesno
 
 
 def create_trial_args(args):
